@@ -1,0 +1,521 @@
+---
+title: "Heart_Disease_Analysis"
+author: "Surendar | Vyshnavi (Project Team 11)"
+date: "2025-03-26"
+output: html_document
+---
+
+## Dataset Background
+This heart disease dataset contains **10,000 observations** and **21 variables**. This dataset includes:
+
+**Demographic variables**: Age and Gender
+
+**Vital Measurement**: Blood Pressure, Cholesterol Levels, BMI
+
+**Lifestyle factors**: Exercise Habits, Smoking, Alcohol Consumption, Sleep Hours
+
+**Medical history**: Family Heart Disease, Diabetes
+
+**Biomarkers**: Triglyceride Level, Fasting Blood Sugar, CRP Level, Homocysteine Level
+
+**Diagnostic Indicators**: Heart Disease Status
+
+**Cholesterol -> Identified as Response Variable** because of its relationship with heart health outcomes. So predict cholesterol level using the linear regression model. *BMI -> Identified as the backup response variable after modeling Cholesterol* - again because these are the recommended factors contributing to heart related issues by Doctors.
+
+1. Heart disease in one of the leading cause of deaths worldwide
+
+2. A direct measurement to be considered for cardiovascular risk
+
+3. Also, serves as one of the primary factor doctors recommend to get in control for heart disease prevention
+
+4. It is responsive to both lifestyle factors and medications
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Data Collection and data cleaning
+**Import the heart_disease dataset**
+```{r}
+library(tidyverse)
+heart_disease_data<-read.csv("data/heart_disease.csv")
+```
+
+**Initial Dataset - Summary**
+```{r}
+initial_dataset_dim<-dim(heart_disease_data)
+initial_data_row_count<-initial_dataset_dim[1]
+initial_data_column_count<-initial_dataset_dim[2]
+cat("Number of rows = ", initial_data_row_count, "\n")
+cat("Number of columns = ", initial_data_column_count, "\n")
+# str(heart_disease_data)
+# head(heart_disease_data, 10)
+# summary(heart_disease_data)
+```
+
+**Total number of columns that has missing values with their names**
+```{r}
+#=================================================================================
+#Numerical Columns
+#=================================================================================
+missing_values<-colSums(is.na(heart_disease_data))
+#print(missing_values)
+missing_value_column_names<- names(missing_values[missing_values>0])
+cat("Missing value Columns that works with is.na(){numerical columns}:\n")
+count_missing_value_columns=1
+for(i in missing_value_column_names)
+{
+  cat(count_missing_value_columns,")",i, ":", missing_values[i],"\n")
+  count_missing_value_columns = count_missing_value_columns + 1
+}
+total_missing_value_columns<-sum(missing_values>0)
+cat("Total columns with missing values (numerical) ->", total_missing_value_columns,"\n")
+#===================================================================================
+#Categorical Columns
+#===================================================================================
+#using na.rm=TRUE to ignore the already accounted NA results when adding up TRUE values
+blank_records<- colSums(heart_disease_data=="" | heart_disease_data==" ",na.rm=TRUE)
+#print(blank_records)
+blank_records_column_names<- names(blank_records[blank_records>0])
+cat("\nBlank String Columns that didn't work with is.na(){categorical columns}:\n")
+count_blank_record_columns=1
+for(j in blank_records_column_names)
+{
+  count_blank_records<- sum(heart_disease_data[[j]]=="" | heart_disease_data[[j]]==" ",na.rm=TRUE)
+  cat(count_blank_record_columns, ")",j, ":", count_blank_records, "\n")
+  count_blank_record_columns = count_blank_record_columns + 1
+  #Assigning NA to those found blank values
+  #dataframe[[columnName]][condition]<- NA
+  heart_disease_data[[j]][heart_disease_data[[j]]==""|heart_disease_data[[j]]==" "]<- NA
+}
+total_blank_record_columns<-sum(blank_records>0)
+cat("Total columns with blank values (categorical) ->", total_blank_record_columns,"\n")
+#====================================================================================
+#Total missing = na + blank/empty strings [Numerical + Categorical]
+#====================================================================================
+missing_values_new<- colSums(is.na(heart_disease_data))
+cat("\nMissing values after converting blank records to NA\n")
+total_blank_record_columns<-sum(missing_values_new>0)
+cat("Total columns with both na and blank values (Categorical + Numerical) -> ", total_blank_record_columns,"\n")
+print(missing_values_new)
+```
+
+**Total number of columns that don't have missing values and their names**
+```{r}
+total_missing_na_blank<- missing_values + missing_values_new
+total_non_missing_na_blank_columns<-sum(total_missing_na_blank==0)
+
+cat("Total Columns not having any missing values -> ", total_non_missing_na_blank_columns,"\n")
+
+count_non_na_blank_columns=1
+no_missing_value_column_names<- names(total_missing_na_blank[total_missing_na_blank==0])
+#print(no_missing_value_column_names)
+cat("Columns with No Missing value :\n")
+for(k in no_missing_value_column_names)
+{
+  cat(count_non_na_blank_columns,")", k, "\n")
+  count_non_na_blank_columns = count_non_na_blank_columns + 1
+}
+```
+
+**Cleaning the data - removing missing values from the dataset and calculating the total rows**
+```{r}
+cleaned_heart_disease_data<-na.omit(heart_disease_data)
+cleaned_dataset_dim<-dim(cleaned_heart_disease_data)
+clean_data_row_count<-cleaned_dataset_dim[1]
+clean_data_column_count<-cleaned_dataset_dim[2]
+
+Total_removed_rows<-initial_data_row_count-clean_data_row_count
+Removed_Rows_Percentage<-(Total_removed_rows/initial_data_row_count)*100
+```
+
+**Cleaned Dataset - Summary**
+```{r}
+cat("Original dataset: ", initial_data_row_count, "rows and ", initial_data_column_count, "columns\n")
+cat("Cleaned dataset: ", clean_data_row_count, "rows and ", clean_data_column_count, "columns\n")
+cat("Total number of removed rows:", Total_removed_rows)
+```
+
+**Converting categorical variables to factors**
+```{r}
+# identifying all the categorical variables and pushing them into a variable
+colnames(cleaned_heart_disease_data)
+categorical_variables<- c("Gender", "Exercise.Habits", "Smoking", "Family.Heart.Disease", "Diabetes", "High.Blood.Pressure", "Low.HDL.Cholesterol", "High.LDL.Cholesterol", "Alcohol.Consumption", "Stress.Level", "Sugar.Consumption", "Heart.Disease.Status")
+
+# converting the newly created vector variable to factors
+cleaned_heart_disease_data[categorical_variables]<- lapply(cleaned_heart_disease_data[categorical_variables],as.factor)
+str(cleaned_heart_disease_data[categorical_variables])
+```
+
+**Distribution of Categorical Variables**
+```{r}
+numerical_variables<- c("Age", "Blood.Pressure", "Cholesterol.Level", "BMI", "Sleep.Hours","Triglyceride.Level", "Fasting.Blood.Sugar", "CRP.Level", "Homocysteine.Level")
+for(var in categorical_variables){
+  count_variables<- table(cleaned_heart_disease_data[[var]])
+  sorted_count_variables<- sort(count_variables)
+  bar_colors<-c("forestgreen", "firebrick","goldenrod3", "dodgerblue", "slateblue")
+  bar_positions<- barplot(sorted_count_variables, main=paste("Distribution of", var), xlab=var, ylab="Frequency", col=bar_colors)
+  text(x=bar_positions, y=sorted_count_variables/2, labels=sorted_count_variables, col="white", cex=0.9, font=2)
+}
+```
+
+**Outliers in Numerical Variables**
+```{r}
+for(var in numerical_variables){
+  boxplot(cleaned_heart_disease_data[[var]], main=var, ylab=var)
+}
+```
+
+2. EDA
+```{r}
+cat("Statistical Summary for Cholesterol Level\n")
+cholesterol_summary<- summary(cleaned_heart_disease_data$Cholesterol.Level)
+print(cholesterol_summary)
+
+cholesterol_sd<- sd(cleaned_heart_disease_data$Cholesterol.Level)
+cat("Standard Deviation - ", round(cholesterol_sd,2),"\n")
+
+hist(cleaned_heart_disease_data$Cholesterol.Level, main="Distribution of Cholesterol Level", xlab="Cholesterol Level", col="yellow", breaks=seq(min(cleaned_heart_disease_data$Cholesterol.Level),max(cleaned_heart_disease_data$Cholesterol.Level),l=21))
+
+#Cholesterol Categories
+cholesterol_levels<- c("Desirable", "Borderline High", "High")
+#print(length(cholesterol_levels))
+cholesterol_bins<- c(0,200,240,Inf)
+cholesterol_categories<- cut(cleaned_heart_disease_data$Cholesterol.Level, breaks=cholesterol_bins, labels= cholesterol_levels)
+cholesterol_count<- table(cholesterol_categories)
+#print(cholesterol_categories)
+#cat("Number of people in each cholesterol category",table(cholesterol_categories))
+#print(sum(table(cholesterol_categories)))
+cholesterol_percent<- (round((table(cholesterol_categories))/sum(table(cholesterol_categories))*100, 1))
+#cat(" % of people in each cholesterol category",cholesterol_percent)
+
+cat("\nCholesterol Categories\n")
+for(category in names(table(cholesterol_levels))){
+  count<- table(cholesterol_categories)[category]
+  percent<- cholesterol_percent[category]
+  cat(category, ":", count , "people (", percent, "%)\n")
+}
+
+barplot(cholesterol_count, main= "Distribution of Cholesterol Categories", xlab="Cholesterol Category", ylab="Number of People", col=c("forestgreen", "firebrick", "slateblue"))
+```
+
+
+```{r}
+#Relationship between Cholesterol Level and a few categorical variables in this dataset
+
+cat("By Gender")
+boxplot(Cholesterol.Level~Gender, data=cleaned_heart_disease_data, main="Cholesterol by Gender", col=c("forestgreen", "firebrick","goldenrod3", "dodgerblue", "slateblue"))
+gender_medians<- tapply(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Gender, median)
+text(1:length(gender_medians), gender_medians, labels=round(gender_medians,1), col="white", cex=0.9, pos=3, font=2)
+
+cat("By Exercise Habits")
+boxplot(Cholesterol.Level~Exercise.Habits, data=cleaned_heart_disease_data, main="Cholesterol by Exercise Habits", col=c("forestgreen", "firebrick","goldenrod3", "dodgerblue", "slateblue"))
+exercise_medians<- tapply(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Exercise.Habits, median)
+text(1:length(exercise_medians), exercise_medians, labels=round(exercise_medians,1), col="white", cex=0.9, pos=3, font=2)
+
+cat("By Smoking Habits")
+boxplot(Cholesterol.Level~Smoking, data=cleaned_heart_disease_data, main="Cholesterol by Smoking Habits", col=c("forestgreen", "firebrick","goldenrod3", "dodgerblue", "slateblue"))
+smoking_medians<- tapply(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Smoking, median)
+text(1:length(smoking_medians), smoking_medians, labels=round(smoking_medians,1), col="white", cex=0.9, pos=3, font=2)
+
+cat("By Heart Disease Status")
+boxplot(Cholesterol.Level~Heart.Disease.Status, data=cleaned_heart_disease_data, main="Cholesterol by Heart Disease Status", col=c("forestgreen", "firebrick","goldenrod3", "dodgerblue", "slateblue"))
+status_medians<- tapply(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Heart.Disease.Status, median)
+text(1:length(status_medians), status_medians, labels=round(status_medians,1), col="white", cex=0.9, pos=3, font=2)
+
+```
+
+```{r}
+# Relationship between Cholesterol and numerical/continuous variables
+numerical_variables<- c("Age", "Blood.Pressure", "Cholesterol.Level", "BMI", "Sleep.Hours","Triglyceride.Level", "Fasting.Blood.Sugar", "CRP.Level", "Homocysteine.Level")
+cat("Correlations with Cholesterol Level")
+
+age_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Age)
+bp_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Blood.Pressure)
+bmi_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$BMI)
+sleep_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Sleep.Hours)
+trig_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Triglyceride.Level)
+sugar_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Fasting.Blood.Sugar)
+crp_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$CRP.Level)
+homo_correlation <- cor(cleaned_heart_disease_data$Cholesterol.Level, cleaned_heart_disease_data$Homocysteine.Level)
+
+cat("Age:", round(age_correlation, 3), "\n")
+cat("Blood Pressure:", round(bp_correlation, 3), "\n")
+cat("BMI:", round(bmi_correlation, 3), "\n")
+cat("Sleep Hours:", round(sleep_correlation, 3), "\n")
+cat("Triglyceride Level:", round(trig_correlation, 3), "\n")
+cat("Fasting Blood Sugar:", round(sugar_correlation, 3), "\n")
+cat("CRP Level:", round(crp_correlation, 3), "\n")
+cat("Homocysteine Level:", round(homo_correlation, 3), "\n")
+
+num_var_names<- c("Age", "Blood Pressure", "BMI", "Sleep Hours", "Triglyceride", "Blood Sugar", "CRP", "Homocysteine")
+correlation_values <- c(age_correlation, bp_correlation, bmi_correlation, sleep_correlation, trig_correlation, sugar_correlation, crp_correlation, homo_correlation)
+
+# Barplot
+barplot(correlation_values, names.arg = num_var_names, main = "Correlation with Cholesterol Level", ylab = "Correlation", col = "dodgerblue", las = 2)
+abline(h = 0)
+```
+
+3. Hypothesis Testing : t-tests(2 groupings) and anova(more than 2 groupings) | Categorical Variables
+```{r}
+two_valued_var<- c("Gender", "Smoking", "Family.Heart.Disease", "Diabetes", "High.Blood.Pressure", "Low.HDL.Cholesterol", "High.LDL.Cholesterol", "Heart.Disease.Status")
+#Gender and Cholesterol Levels
+gender_test<- t.test(Cholesterol.Level~Gender, data=cleaned_heart_disease_data)
+cat("Gender and Cholesterol t-test:\n")
+print(gender_test)
+
+#Smoking and Cholesterol Levels
+smoking_test <- t.test(Cholesterol.Level ~ Smoking, data = cleaned_heart_disease_data)
+cat("\nSmoking and Cholesterol t-test:\n")
+print(smoking_test)
+
+#Family Heart Disease and Cholesterol Levels
+fam_heart_test <- t.test(Cholesterol.Level ~ Family.Heart.Disease, data = cleaned_heart_disease_data)
+cat("\nFamily Heart Disease and Cholesterol t-test:\n")
+print(fam_heart_test)
+
+#Diabetes and Cholesterol Levels
+diabetes_test <- t.test(Cholesterol.Level ~ Diabetes, data = cleaned_heart_disease_data)
+cat("\nDiabetes and Cholesterol t-test:\n")
+print(diabetes_test)
+
+#High BP and Cholesterol Levels
+BP_test <- t.test(Cholesterol.Level ~ High.Blood.Pressure, data = cleaned_heart_disease_data)
+cat("\nHigh Blood Pressure and Cholesterol t-test:\n")
+print(BP_test)
+
+#Low HDL Cholesterol and Cholesterol Levels
+low_hdl_test <- t.test(Cholesterol.Level ~ Low.HDL.Cholesterol, data = cleaned_heart_disease_data)
+cat("\nLow HDL and Cholesterol t-test:\n")
+print(low_hdl_test)
+
+#High LDL Cholesterol and Cholesterol Levels
+high_ldl_test <- t.test(Cholesterol.Level ~ High.LDL.Cholesterol, data = cleaned_heart_disease_data)
+cat("\nHigh LDL and Cholesterol t-test:\n")
+print(high_ldl_test)
+
+#Heart Disease Status and Cholesterol Levels
+heart_test <- t.test(Cholesterol.Level ~ Heart.Disease.Status, data = cleaned_heart_disease_data)
+cat("\nHeart Disease Status and Cholesterol t-test:\n")
+print(heart_test)
+
+multi_valued_var<- c("Exercise.Habits", "Alcohol.Consumption", "Stress.Level", "Sugar.Consumption")
+
+exercise_anova <- aov(Cholesterol.Level ~ Exercise.Habits, data = cleaned_heart_disease_data)
+cat("\nExercise Habits and Cholesterol ANOVA:\n")
+print(summary(exercise_anova))
+
+alcohol_anova <- aov(Cholesterol.Level ~ Alcohol.Consumption, data = cleaned_heart_disease_data)
+cat("\nAlcohol Consumption and Cholesterol ANOVA:\n")
+print(summary(alcohol_anova))
+
+stress_anova <- aov(Cholesterol.Level ~ Stress.Level, data = cleaned_heart_disease_data)
+cat("\nStress Level and Cholesterol ANOVA:\n")
+print(summary(stress_anova))
+
+sugar_anova <- aov(Cholesterol.Level ~ Sugar.Consumption, data = cleaned_heart_disease_data)
+cat("\nSugar Consumption and Cholesterol ANOVA:\n")
+print(summary(sugar_anova))
+```
+
+Hypothesis Testing : correlation tests | Numerical Variables
+```{r}
+
+numerical_vars<- c("Age", "Blood.Pressure", "BMI", "Sleep.Hours", "Triglyceride.Level", "Fasting.Blood.Sugar", "CRP.Level", "Homocysteine.Level")
+
+cat("\nCORRELATION TESTS WITH CHOLESTEROL LEVEL:\n")
+for(var in numerical_vars)
+  {
+  correlation_tests<- cor.test(cleaned_heart_disease_data[[var]], cleaned_heart_disease_data$Cholesterol.Level)
+  cat(var, "Correlation coefficient: ",round(correlation_tests$estimate,4), "p-value: ", round(correlation_tests$p.value,4), "95% CI: [", round(correlation_tests$conf.int[1],4), ",", round(correlation_tests$conf.int[2],4), "]\n")
+  }
+```
+
+Summary of hypothesis testing
+```{r}
+cat("\nSUMMARY OF HYPOTHESIS TESTING RESULTS:\n")
+cat("1. Significant categorical variables (p < 0.05): None of the t-test, and anova categorical columns have p<0,05 showing that neither have a statistically significant effect on cholesterol levels within the dataset\n")
+cat("2. Significant numerical variables (p < 0.05): BMI has a p value(statistical significance) of 0.0345 which is less than 0.05 but the correlation is extremely weak with r value(practical significance) as 0.0217, showing weak relationship. r value is postive meaning BMI increases, then cholesterol tend to increase slightly but the value is close to zero telling us that the relationship is very weak.\n")
+cat("3. Overall finding: ['Most variables did not show significant relationships with cholesterol levels']\n")
+
+```
+
+Train-Test 70% | 30% split
+```{r}
+set.seed(123)
+sample_indices <- sample(2, nrow(cleaned_heart_disease_data), replace=TRUE, prob=c(0.7, 0.3))
+train_data <- cleaned_heart_disease_data[sample_indices==1, ]
+test_data <- cleaned_heart_disease_data[sample_indices==2, ]
+cat("Training set:", nrow(train_data), "observations (", round(nrow(train_data)/nrow(cleaned_heart_disease_data)*100, 1), "%)\n")
+cat("Test set:", nrow(test_data), "observations (", round(nrow(test_data)/nrow(cleaned_heart_disease_data)*100, 1), "%)\n")
+
+```
+
+Trying to reveal any relationships by the combination of multiple variables that we wanted to check(handpicked by us)
+
+```{r}
+main_model <- lm(Cholesterol.Level ~ Age + Gender + BMI + Exercise.Habits + Smoking + Sleep.Hours + Diabetes, data = train_data)
+summary(main_model)
+
+model_2 <- lm(Cholesterol.Level ~ Age + Gender + BMI + Exercise.Habits + Smoking + Sleep.Hours + Diabetes + Age:BMI + Exercise.Habits:Smoking + Gender:Age + BMI:Diabetes, data = train_data)
+summary(model_2)
+
+# Compare both the models
+anova(main_model, model_2)
+
+```
+
+Subset Selection (all variables; no handpicking)| 1.Full Model | 2.Forward Step Model | 3.Backward Step Model
+```{r}
+full_model <- lm(Cholesterol.Level ~ ., data = train_data)
+summary(full_model)
+
+intercept_only <- lm(Cholesterol.Level ~ 1, data = train_data)
+forward_step_model <- step(intercept_only, scope = list(lower = ~ 1, upper = ~ .), direction = "forward", data = train_data)
+summary(forward_step_model)
+
+backward_step_model<- step(full_model, direction = "backward")
+summary(backward_step_model)
+
+```
+
+Build a linear regression model with subset Selection (Summary)
+```{r}
+cat("\nSUMMARY OF SUBSET SELECTION RESULTS:\n")
+cat("1.FULL MODEL: Includes all variables: No Statiscally significant variables\n")
+cat("2.FORWARD STEP: No variables got added to the intercept-only model. Suggest no variable improved the base intercept-only model\n")
+cat("3. BACKWARD STEP: Got a model with Age(p=0.021) and CRP Level(p=0.026); p-value suggests that they are statistically significant\n")
+cat("The predictors in this dataset have very limited ability to explain cholesterol variation; Though Age and CRP Level emerged as important predictors, their effects were modest. This data suggests and challenges the common assumptions about strong relationships between lifestyle changes and their impact on the cholesterol levels- maybe we need more complex model techniques to explore and proceed further.")
+```
+
+Finding all signifiant attributes and assess the model
+```{r}
+cat("Identified Age and CRP.Level as the only significant predictors; backward model's statistical significance (p=0.0058); r2 is very small(0.15%) and explains very little about the difference in cholesterol levels between high and low cholesterol. This might suggest that many other things are not measured in this study like some genetical info, diet info etc.")
+```
+
+Use the model to predict the response in the test dataset. Evaluate the prediction.
+```{r}
+final_model <- lm(Cholesterol.Level ~ Age + CRP.Level, data = train_data)
+
+#predict on test data
+test_predictions <- predict(final_model, newdata = test_data)
+
+# prediction calculations
+prediction_error <- test_data$Cholesterol.Level - test_predictions
+test_mse<- mean(prediction_error^2)
+test_rmse <-sqrt(test_mse)
+test_mae<- mean(abs(prediction_error))
+cat("Test MSE:", round(test_mse, 2), "\n")
+cat("Test RMSE:", round(test_rmse, 2), "\n")
+cat("Test MAE:", round(test_mae, 2), "\n")
+
+# Calculate R-squared on test data
+ss_total<- sum((test_data$Cholesterol.Level - mean(test_data$Cholesterol.Level))^2)
+ss_residual<- sum(prediction_error^2)
+test_r_squared<- 1 - (ss_residual/ss_total)
+cat("Test R-squared:", round(test_r_squared, 4), "\n")
+
+cat("Test MSE: 1923.35 | Test RMSE: 43.86 | Test MAE: 38.05 | Test R-squared: -0.003")
+cat("RMSE of 43.86 denotes the model prediction are not accurate at all and off by 44 mg'dL when predicting cholesterol levels.")
+cat("MAE of 38.05 denotes that the predictions differ from actual values by about 38.05 mg/dL")
+cat("R-squared of -0.003 reveals the model performs worse than using the mean choelsterol value for all predictions.")
+cat("Conclusion: The variables  (Age and CRP Level) are not good for predicting cholesterol values. The model can't practically predict cholesterol from the variables in the dataset; meaning the cholesterol levels may vary die to other factors not in this dataset; the relationships between the variables and cholesterol might not be a linear one and might be complex than initially thought it would be")
+
+```
+
+Hypothesis Testing with BMI as response variable
+
+T-tests for binary variables
+```{r}
+for(var in two_valued_var) {
+  formula<- as.formula(paste("BMI ~", var))
+  test_result<- t.test(formula, data = cleaned_heart_disease_data)
+  cat(var, "and BMI t-test p-value:", round(test_result$p.value, 4), "\n")
+}
+```
+
+
+ANOVA for multi-level variables
+```{r}
+for(var in multi_valued_var) {
+  formula<- as.formula(paste("BMI ~", var))
+  anova_result<- aov(formula, data = cleaned_heart_disease_data)
+  anova_summary<- summary(anova_result)
+  cat(var, "and BMI ANOVA p-value:", round(anova_summary[[1]]$`Pr(>F)`[1], 4), "\n")
+}
+```
+
+Correlation tests for numerical variables
+
+```{r}
+numerical_vars_no_bmi<- numerical_vars[numerical_vars != "BMI"]
+for(var in numerical_vars_no_bmi) {
+  correlation_test<- cor.test(cleaned_heart_disease_data[[var]], cleaned_heart_disease_data$BMI)
+  cat(var, "Correlation with BMI:", round(correlation_test$estimate, 4), "p-value:", round(correlation_test$p.value, 4), "\n")
+}
+```
+
+Summary of hypothesis testing
+```{r}
+cat("\nSUMMARY OF HYPOTHESIS TESTING RESULTS:\n")
+cat("1. Only Heart Disease Status showed a marginally significant relationship with BMI (p = 0.0458) which is less than the expected p<0.05\n")
+cat("2. Gender was close to significance (p = 0.0807).\n")
+cat("3. Overall finding: All other categorical and numerical variables showed no significant relationships with BMI\n")
+
+```
+
+Regression modeling with BMI as response
+```{r}
+
+# Train | Test Split data
+set.seed(123)
+sample_indice <- sample(2, nrow(cleaned_heart_disease_data), replace=TRUE, prob=c(0.7, 0.3))
+train_data <-cleaned_heart_disease_data[sample_indices==1, ]
+test_data<- cleaned_heart_disease_data[sample_indices==2, ]
+
+# Full model
+full_model<- lm(BMI ~ . - Cholesterol.Level, data = train_data)
+summary(full_model)
+
+# Forward step
+intercept_only<- lm(BMI ~ 1, data = train_data)
+forward_step_model <- step(intercept_only, scope = list(lower = ~ 1, upper = ~ . - Cholesterol.Level), direction = "forward", data = train_data)
+summary(forward_step_model)
+
+# Backward step
+backward_step_model <-step(full_model, direction = "backward")
+summary(backward_step_model)
+
+```
+
+```{r}
+cat("\nSUMMARY OF SUBSET SELECTION RESULTS:\n")
+cat("1.FULL MODEL: Includes all variables: No Statiscally significant variables\n")
+cat("2.FORWARD STEP: No variables got added to the intercept-only model. Suggest no variable improved the base intercept-only model\n")
+cat("3. BACKWARD STEP: Got a model with Gender and Heart Disease Status, both significant at p < 0.05\n")
+```
+
+```{r}
+# Evaluate model on test data
+final_model<- backward_step_model
+test_predictions <-predict(final_model, newdata = test_data)
+prediction_error<- test_data$BMI - test_predictions
+test_rmse <-sqrt(mean(prediction_error^2))
+test_mae<- mean(abs(prediction_error))
+ss_total<- sum((test_data$BMI - mean(test_data$BMI))^2)
+ss_residual <-sum(prediction_error^2)
+test_r_squared<- 1 - (ss_residual/ss_total)
+
+cat("Test RMSE:", round(test_rmse, 2), "\n")
+cat("Test MAE:", round(test_mae, 2), "\n")
+cat("Test R-squared:", round(test_r_squared, 4), "\n")
+```
+
+```{r}
+cat("Test MSE: 1923.35 | Test RMSE: 6.17 | Test MAE: 5.29 | Test R-squared: -0.0014")
+cat("RMSE of 6.17 denotes the model prediction are not accurate at all and off by 6.17 units when predicting cholesterol levels.")
+cat("MAE of 38.05 denotes that the predictions differ from actual values by about 5.29 units")
+cat("R-squared of -0.0014 reveals the model performs worse than using the mean BMI for all predictions.")
+cat("Conclusion: The variables  (Gender and Heart Disease Status) are not good for predicting BMI. The model can't practically predict BMI from the variables in the dataset; meaning the BMI may vary due to other factors not in this dataset; the relationships between the variables and BMI(health metrics) might not be a linear one and might be complex models than initially thought it would be")
+
+```
