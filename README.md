@@ -62,6 +62,7 @@ The analysis is delivered through a macro-enabled PowerPoint presentation:
 
 - **PADMAVATHI VYSHNAVI MADARAMPALLI** – Data processing, Vizualization, Interpretation 
 - **SURENDAR** – Data cleaning,Model deployment
+  
 Master’s in Information Technology and Management – ILLINOIS INSTITUTE OF TECHNOLOGY
 
 ---
